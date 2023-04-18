@@ -2,19 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:reccomendify/ChoosePage.dart';
 import 'package:reccomendify/WelcomeScreen.dart';
 import 'package:reccomendify/main.dart';
+import 'package:spotify_sdk/spotify_sdk.dart';
+import 'package:logger/logger.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/services.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
   final String title;
 
   @override
@@ -22,6 +16,51 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  bool _loading = false;
+  bool _connected = false;
+  final Logger _logger = Logger(
+    //filter: CustomLogFilter(), // custom logfilter can be used to have logs in release mode
+    printer: PrettyPrinter(
+      methodCount: 2, // number of method calls to be displayed
+      errorMethodCount: 8, // number of method calls if stacktrace is provided
+      lineLength: 120, // width of the output
+      colors: true, // Colorful log messages
+      printEmojis: true, // Print an emoji for each log message
+      printTime: true,
+    ),
+  );
+
+  Future<void> connectToSpotifyRemote() async {
+    try {
+      setState(() {
+        _loading = true;
+      });
+      var result = await SpotifySdk.connectToSpotifyRemote(
+          clientId: dotenv.env['CLIENT_ID'].toString(),
+          redirectUrl: dotenv.env['REDIRECT_URL'].toString());
+      if (result) {
+        Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) => ChoosePage(
+                      title: '',
+                    )));
+      } else {
+        setStatus('connect to spotify failed');
+      }
+    } on PlatformException catch (e) {
+      setState(() {
+        _loading = false;
+      });
+      setStatus(e.code, message: e.message);
+    } on MissingPluginException {
+      setState(() {
+        _loading = false;
+      });
+      setStatus('not implemented');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -36,8 +75,8 @@ class _LoginPageState extends State<LoginPage> {
                 height: 110,
                 width: 165,
               ),
-              SizedBox(height: 200),
-              Text(
+              const SizedBox(height: 200),
+              const Text(
                 "Enjoy Finding New Music",
                 style: TextStyle(
                     fontFamily: 'Impact',
@@ -45,7 +84,7 @@ class _LoginPageState extends State<LoginPage> {
                     color: Colors.white,
                     fontWeight: FontWeight.w700),
               ),
-              SizedBox(height: 200),
+              const SizedBox(height: 200),
               Container(
                 height: 65,
                 width: 350,
@@ -55,12 +94,7 @@ class _LoginPageState extends State<LoginPage> {
                 child: TextButton(
                   onPressed: () {
                     //login using spotify
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => ChoosePage(
-                                  title: '',
-                                )));
+                    connectToSpotifyRemote();
                   },
                   child: Text(
                     'Login With Spotify',
@@ -97,5 +131,10 @@ class _LoginPageState extends State<LoginPage> {
         ),
       ),
     );
+  }
+
+  void setStatus(String code, {String? message}) {
+    var text = message ?? '';
+    _logger.i('$code$text');
   }
 }

@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:reccomendify/LoginPage.dart';
+import 'package:reccomendify/ChoosePage.dart';
 import 'package:reccomendify/WelcomeScreen.dart';
+import 'package:reccomendify/main.dart';
 import 'package:spotify_sdk/spotify_sdk.dart';
-import 'package:flutter/material.dart';
+import 'package:logger/logger.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/services.dart';
+import 'package:reccomendify/LoginPage.dart';
 
 Future<void> main() async {
+  await dotenv.load(fileName: '.env');
   runApp(const MyApp());
 }
 
@@ -28,7 +32,7 @@ class MyApp extends StatelessWidget {
           // Notice that the counter didn't reset back to zero; the application
           // is not restarted.
           ),
-      home: const MyHomePage(title: "Welcome screen"),
+      home: const LoginPage(title: "Welcome screen"),
     );
   }
 }

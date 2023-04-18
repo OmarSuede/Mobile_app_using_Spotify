@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:reccomendify/PlaylistPage.dart';
 import 'package:reccomendify/WelcomeScreen.dart';
 import 'package:reccomendify/main.dart';
 
@@ -70,7 +71,7 @@ class _ChoosePageState extends State<ChoosePage> {
                     Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (_) => WelcomeScreen(
+                            builder: (_) => PlaylistPage(
                                   title: '',
                                 )));
                   },
