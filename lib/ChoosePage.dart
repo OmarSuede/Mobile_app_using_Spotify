@@ -26,9 +26,6 @@ class _ChoosePageState extends State<ChoosePage> {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: Color(0xFF1C1B1B),
-        ),
         backgroundColor: Color(0xFF1C1B1B),
         body: Center(
           child: Column(

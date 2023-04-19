@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:reccomendify/PlaylistView.dart';
 import 'package:reccomendify/RecommendedPlaylist.dart';
 //import 'package:reccomendify/RecommendedPlaylist.dart';
 import 'package:reccomendify/WelcomeScreen.dart';
@@ -9,6 +10,7 @@ import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter/services.dart';
+import 'package:jwt_decode/jwt_decode.dart';
 
 class PlaylistPage extends StatefulWidget {
   const PlaylistPage({super.key, required this.title});
@@ -31,13 +33,29 @@ class PlaylistPage extends StatefulWidget {
 class _PlaylistPageState extends State<PlaylistPage> {
   List<Playlist> _playlists = [];
   bool _loading = true;
-  Playlist? _selectedPlaylist;
+  late Playlist? _selectedPlaylist;
   late Playlist NewPlaylist;
+  late String _accessToken;
+  String userId = "";
+
+  void _initSpotify() async {
+    var accessToken = await SpotifySdk.getAccessToken(
+        clientId: dotenv.env['CLIENT_ID'].toString(),
+        redirectUrl: dotenv.env['REDIRECT_URL'].toString(),
+        scope: 'app-remote-control, '
+            'user-modify-playback-state, '
+            'playlist-read-private, '
+            'playlist-modify-public,user-read-currently-playing,user-read-email,user-read-private');
+    setState(() {
+      _accessToken = accessToken;
+    });
+    await _fetchPlaylists();
+  }
 
   @override
   void initState() {
     super.initState();
-    _fetchPlaylists();
+    _initSpotify();
   }
 
   final Logger _logger = Logger(
@@ -58,18 +76,11 @@ class _PlaylistPageState extends State<PlaylistPage> {
 
   Future<void> _fetchPlaylists() async {
     try {
-      final accessToken = await SpotifySdk.getAccessToken(
-          clientId: dotenv.env['CLIENT_ID'].toString(),
-          redirectUrl: dotenv.env['REDIRECT_URL'].toString(),
-          scope: 'app-remote-control, '
-              'user-modify-playback-state, '
-              'playlist-read-private, '
-              'playlist-modify-public,user-read-currently-playing');
       final response = await http.get(
         Uri.parse('https://api.spotify.com/v1/me/playlists'),
-        headers: {'Authorization': 'Bearer $accessToken'},
+        headers: {'Authorization': 'Bearer $_accessToken'},
       );
-
+      //print("yooooooo" + _accessToken);
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
         final items = jsonData['items'];
@@ -79,117 +90,10 @@ class _PlaylistPageState extends State<PlaylistPage> {
           _loading = false;
         });
       } else {
-        throw Exception('Failed to fetch playlists');
+        throw Exception('Failed to fetch playlists  ${response.reasonPhrase}');
       }
     } catch (e) {
       print(e);
-    }
-  }
-
-  Future<List<Song>> _fetchSongs(Playlist playlist) async {
-    try {
-      final accessToken = await SpotifySdk.getAccessToken(
-          clientId: dotenv.env['CLIENT_ID'].toString(),
-          redirectUrl: dotenv.env['REDIRECT_URL'].toString(),
-          scope: 'app-remote-control, '
-              'user-modify-playback-state, '
-              'playlist-read-private, '
-              'playlist-modify-public,user-read-currently-playing');
-      print("yoooo ${playlist.id} ");
-
-      final response = await http.get(
-        Uri.parse('https://api.spotify.com/v1/playlists/${playlist.id}/tracks'),
-        headers: {'Authorization': 'Bearer $accessToken'},
-      );
-// fix problem where if a song is removed from spotify it will bug the request
-      if (response.statusCode == 200) {
-        final jsonData = json.decode(response.body);
-        final items = jsonData['items'] as List<dynamic>;
-        final songs = items.map((items) {
-          final song = items['track'];
-          return Song(
-            id: song['id'] as String,
-            name: song['name'] as String,
-            artistName: (song['artists'] as List<dynamic>)
-                .map((artist) => artist['name'] as String)
-                .join(', '),
-          );
-        }).toList();
-        return songs;
-      } else {
-        throw Exception('Failed to fetch songs');
-      }
-    } catch (e) {
-      print(e);
-      return [];
-    }
-  }
-
-  Future<Playlist> recommendRandomSongs(Playlist playlist) async {
-    final tracks = await _fetchSongs(playlist);
-    final trackIds = tracks.map((track) => track.id).toList();
-    final randomTrackIds = (trackIds.toList()..shuffle()).take(5).join(',');
-    print('hello $randomTrackIds');
-    final accessToken = await SpotifySdk.getAccessToken(
-        clientId: dotenv.env['CLIENT_ID'].toString(),
-        redirectUrl: dotenv.env['REDIRECT_URL'].toString(),
-        scope: 'app-remote-control, '
-            'user-modify-playback-state, '
-            'playlist-read-private, '
-            'playlist-modify-public,user-read-currently-playing');
-
-    final url =
-        'https://api.spotify.com/v1/recommendations?seed_tracks=$randomTrackIds&limit=10';
-
-    final response = await http.get(
-      Uri.parse(url),
-      headers: {'Authorization': 'Bearer $accessToken'},
-    );
-
-    if (response.statusCode == 200) {
-      final jsonResponse = json.decode(response.body);
-      final trackJson = jsonResponse['tracks'] as List<dynamic>;
-      final trackUris =
-          trackJson.map((track) => 'spotify:track:${track['id']}').toList();
-
-      final playlistName = '${playlist.name} Recommendations';
-      const createPlaylistUrl = 'https://api.spotify.com/v1/me/playlists';
-
-      final createPlaylistResponse = await http.post(
-        Uri.parse(createPlaylistUrl),
-        headers: {
-          'Authorization': 'Bearer $accessToken',
-          'Content-Type': 'application/json'
-        },
-        body: json.encode({'name': playlistName}),
-      );
-
-      if (createPlaylistResponse.statusCode == 201) {
-        final playlistJson = json.decode(createPlaylistResponse.body);
-        final playlistId = playlistJson['id'] as String;
-
-        final addTracksUrl =
-            'https://api.spotify.com/v1/playlists/$playlistId/tracks';
-
-        await http.post(
-          Uri.parse(addTracksUrl),
-          headers: {
-            'Authorization': 'Bearer $accessToken',
-            'Content-Type': 'application/json'
-          },
-          body: json.encode({'uris': trackUris}),
-        );
-        final createdPlaylist = Playlist(
-          id: playlistId,
-          name: playlistName,
-        );
-        return createdPlaylist;
-      } else {
-        throw Exception(
-            'Failed to create playlist: ${createPlaylistResponse.statusCode}');
-      }
-    } else {
-      throw Exception('Failed to recommend songs: ${response.statusCode}');
     }
   }
 
@@ -197,7 +101,12 @@ class _PlaylistPageState extends State<PlaylistPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Playlists'),
+        automaticallyImplyLeading: false,
+        title: const Text('Playlists',
+            style: TextStyle(
+              fontSize: 20,
+            )),
+        centerTitle: true,
         backgroundColor: const Color(0xFF1C1B1B),
       ),
       backgroundColor: const Color(0xFF1C1B1B),
@@ -227,17 +136,18 @@ class _PlaylistPageState extends State<PlaylistPage> {
                       onTap: () async {
                         // Navigate to playlist details screen
                         _selectedPlaylist = playlist;
-                        NewPlaylist =
-                            await recommendRandomSongs(_selectedPlaylist!);
+
+                        //NewPlaylist =
+                        //await recommendRandomSongs(_selectedPlaylist!);
                         Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (_) => RecommendedPlaylist(
-                                      playlist: NewPlaylist,
+                                builder: (_) => PlaylistView(
+                                      playlist: _selectedPlaylist!,
                                     )));
                       },
                     ),
-                    Divider(
+                    const Divider(
                       height: 20,
                       thickness: 1,
                       indent: 16,
@@ -284,12 +194,14 @@ class Song {
   final String name;
   final String artistName;
   final String? imageUrl;
+  //final Duration songDuration;
 
   Song({
     required this.id,
     required this.name,
     required this.artistName,
     this.imageUrl,
+    //required this.songDuration,
   });
 
   factory Song.fromJson(Map<String, dynamic> json) {
@@ -299,12 +211,14 @@ class Song {
     final imageUrl = json['track']['album']['images'].isNotEmpty
         ? json['track']['album']['images'][0]['url']
         : null;
+    //final songDuration = Duration(milliseconds: json['track']['duration_ms']);
 
     return Song(
       id: id,
       name: name,
       artistName: artistName,
       imageUrl: imageUrl,
+      //songDuration: songDuration,
     );
   }
 }

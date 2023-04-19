@@ -4,22 +4,25 @@ import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter/services.dart';
+import 'package:reccomendify/RecommendedPlaylist.dart';
 import 'package:spotify_sdk/spotify_sdk.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:reccomendify/PlaylistPage.dart';
 
-class RecommendedPlaylist extends StatefulWidget {
+import 'package:reccomendify/PlaylistPage.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+class PlaylistView extends StatefulWidget {
   final Playlist playlist;
   // ignore: use_key_in_widget_constructors
-  const RecommendedPlaylist({required this.playlist});
+  const PlaylistView({required this.playlist});
   @override
   // ignore: library_private_types_in_public_api
-  State<RecommendedPlaylist> createState() => _RecommendedPlaylistState();
+  State<PlaylistView> createState() => _PlaylistViewState();
 }
 
-class _RecommendedPlaylistState extends State<RecommendedPlaylist> {
-  List<Song> _songsFuture = [];
+class _PlaylistViewState extends State<PlaylistView> {
   late String _accessToken;
+  List<Song> _songsFuture = [];
+  late Playlist NewPlaylist;
 
   void _initSpotify() async {
     var accessToken = await SpotifySdk.getAccessToken(
@@ -56,8 +59,7 @@ class _RecommendedPlaylistState extends State<RecommendedPlaylist> {
               .toString()
               .split('.')
               .first
-              .padLeft(8, "0") as Duration;
-              */
+              .padLeft(8, "0") as Duration;*/
           return Song(
             id: song['id'] as String,
             name: song['name'] as String,
@@ -76,6 +78,65 @@ class _RecommendedPlaylistState extends State<RecommendedPlaylist> {
       }
     } catch (e) {
       print(e);
+    }
+  }
+
+  Future<Playlist> recommendRandomSongs(Playlist playlist) async {
+    final tracks = _songsFuture;
+    final trackIds = tracks.map((track) => track.id).toList();
+    final randomTrackIds = (trackIds.toList()..shuffle()).take(5).join(',');
+
+    final url =
+        'https://api.spotify.com/v1/recommendations?seed_tracks=$randomTrackIds&limit=30';
+
+    final response = await http.get(
+      Uri.parse(url),
+      headers: {'Authorization': 'Bearer $_accessToken'},
+    );
+
+    if (response.statusCode == 200) {
+      final jsonResponse = json.decode(response.body);
+      final trackJson = jsonResponse['tracks'] as List<dynamic>;
+      final trackUris =
+          trackJson.map((track) => 'spotify:track:${track['id']}').toList();
+
+      final playlistName = '${playlist.name} Recommendations';
+      const createPlaylistUrl = 'https://api.spotify.com/v1/me/playlists';
+
+      final createPlaylistResponse = await http.post(
+        Uri.parse(createPlaylistUrl),
+        headers: {
+          'Authorization': 'Bearer $_accessToken',
+          'Content-Type': 'application/json'
+        },
+        body: json.encode({'name': playlistName}),
+      );
+      if (createPlaylistResponse.statusCode == 201) {
+        final playlistJson = json.decode(createPlaylistResponse.body);
+        final playlistId = playlistJson['id'] as String;
+
+        final addTracksUrl =
+            'https://api.spotify.com/v1/playlists/$playlistId/tracks';
+
+        await http.post(
+          Uri.parse(addTracksUrl),
+          headers: {
+            'Authorization': 'Bearer $_accessToken',
+            'Content-Type': 'application/json'
+          },
+          body: json.encode({'uris': trackUris}),
+        );
+        final createdPlaylist = Playlist(
+          id: playlistId,
+          name: playlistName,
+        );
+        return createdPlaylist;
+      } else {
+        throw Exception(
+            'Failed to create playlist: ${createPlaylistResponse.statusCode}');
+      }
+    } else {
+      throw Exception('Failed to recommend songs: ${response.statusCode}');
     }
   }
 
@@ -103,14 +164,9 @@ class _RecommendedPlaylistState extends State<RecommendedPlaylist> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: Center(
-          child: Text(widget.playlist.name,
-              style: const TextStyle(
-                fontSize: 20,
-              )),
-        ),
+        title: Text(widget.playlist.name, style: const TextStyle(fontSize: 20)),
         backgroundColor: const Color(0xFF1C1B1B),
+        centerTitle: true,
       ),
       backgroundColor: const Color(0xFF1C1B1B),
       body: FutureBuilder<void>(
@@ -145,25 +201,8 @@ class _RecommendedPlaylistState extends State<RecommendedPlaylist> {
                           color: Colors.grey,
                         ),
                       ),
-                      onTap: () {
-                        SpotifySdk.play(
-                          spotifyUri: 'spotify:track:${songs.id}',
-                        );
-                        /*
-                        final trackList = _songsFuture
-                            .skip(index + 1)
-                            .map((song) => 'spotify:track:${song.id}')
-                            .toList();
-
-                        if (trackList.isNotEmpty) {
-                          await SpotifySdk.queue(
-                            spotifyUri: trackList.join(','),
-                          );
-                        }
-                        */
-                      },
                     ),
-                    const Divider(
+                    Divider(
                       height: 20,
                       thickness: 1,
                       indent: 16,
@@ -174,7 +213,7 @@ class _RecommendedPlaylistState extends State<RecommendedPlaylist> {
               },
             );
           } else {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: CircularProgressIndicator());
           }
         },
       ),
@@ -188,22 +227,27 @@ class _RecommendedPlaylistState extends State<RecommendedPlaylist> {
               Container(
                 height: 50,
                 width: 150,
-                child: ElevatedButton(
-                  style: ButtonStyle(
-                    backgroundColor:
-                        MaterialStatePropertyAll<Color>(Color(0xFFFF6161)),
-                  ),
-                  onPressed: () async {
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => PlaylistPage(
-                                  title: '',
-                                )));
-                  },
-                  child: Text(
-                    'Go back',
-                    style: TextStyle(color: Color(0xFF1C1B1B), fontSize: 15),
+                child: SizedBox(
+                  width: 100,
+                  height: 25,
+                  child: ElevatedButton(
+                    style: ButtonStyle(
+                      backgroundColor:
+                          MaterialStatePropertyAll<Color>(Color(0xFFFF6161)),
+                    ),
+                    onPressed: () async {
+                      NewPlaylist = await recommendRandomSongs(widget.playlist);
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => RecommendedPlaylist(
+                                    playlist: NewPlaylist,
+                                  )));
+                    },
+                    child: Text(
+                      'Generate Playlist',
+                      style: TextStyle(color: Color(0xFF1C1B1B), fontSize: 15),
+                    ),
                   ),
                 ),
               ),
