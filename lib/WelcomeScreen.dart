@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:reccomendify/main.dart';
+import 'package:musily/main.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key, required this.title});

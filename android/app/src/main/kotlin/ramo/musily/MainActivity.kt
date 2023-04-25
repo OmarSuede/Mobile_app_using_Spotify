@@ -1,4 +1,4 @@
-package com.example.reccomendify
+package ramo.musily
 
 import io.flutter.embedding.android.FlutterActivity
 

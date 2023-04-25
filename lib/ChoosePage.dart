@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:reccomendify/PlaylistPage.dart';
-import 'package:reccomendify/WelcomeScreen.dart';
-import 'package:reccomendify/main.dart';
+import 'package:musily/PlaylistPage.dart';
+import 'package:musily/WelcomeScreen.dart';
+import 'package:musily/main.dart';
 
 class ChoosePage extends StatefulWidget {
   const ChoosePage({super.key, required this.title});

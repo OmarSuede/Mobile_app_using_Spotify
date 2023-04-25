@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:reccomendify/PlaylistView.dart';
-import 'package:reccomendify/RecommendedPlaylist.dart';
-//import 'package:reccomendify/RecommendedPlaylist.dart';
-import 'package:reccomendify/WelcomeScreen.dart';
-import 'package:reccomendify/main.dart';
+import 'package:musily/PlaylistView.dart';
+import 'package:musily/RecommendedPlaylist.dart';
+import 'package:musily/WelcomeScreen.dart';
+import 'package:musily/main.dart';
 import 'package:http/http.dart' as http;
 import 'package:spotify_sdk/spotify_sdk.dart';
 import 'dart:convert';
@@ -11,6 +10,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter/services.dart';
 import 'package:jwt_decode/jwt_decode.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PlaylistPage extends StatefulWidget {
   const PlaylistPage({super.key, required this.title});
@@ -36,6 +36,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
   late Playlist? _selectedPlaylist;
   late Playlist NewPlaylist;
   late String _accessToken;
+
   String userId = "";
 
   void _initSpotify() async {
@@ -45,10 +46,13 @@ class _PlaylistPageState extends State<PlaylistPage> {
         scope: 'app-remote-control, '
             'user-modify-playback-state, '
             'playlist-read-private, '
-            'playlist-modify-public,user-read-currently-playing,user-read-email,user-read-private');
-    setState(() {
-      _accessToken = accessToken;
-    });
+            'playlist-modify-public,user-read-currently-playing,'
+            'user-read-private,'
+            'user-read-email,');
+    _accessToken = accessToken;
+    final token = await SharedPreferences.getInstance();
+    await token.setString("_Token", _accessToken);
+
     await _fetchPlaylists();
   }
 
@@ -102,61 +106,68 @@ class _PlaylistPageState extends State<PlaylistPage> {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: const Text('Playlists',
-            style: TextStyle(
-              fontSize: 20,
-            )),
+        title: const Text(
+          'Playlists',
+          style: TextStyle(
+            fontSize: 20,
+          ),
+        ),
         centerTitle: true,
         backgroundColor: const Color(0xFF1C1B1B),
       ),
       backgroundColor: const Color(0xFF1C1B1B),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              itemCount: _playlists.length,
-              itemBuilder: (context, index) {
-                final playlist = _playlists[index];
-                return Column(
-                  children: [
-                    ListTile(
-                      leading: Image.network(
-                        playlist.imageUrl ?? Playlist.defaultImageUrl,
-                        width: 50,
-                        height: 50,
-                        fit: BoxFit.cover,
-                      ),
-                      title: Text(
-                        playlist.name,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await _fetchPlaylists();
+        },
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView.builder(
+                itemCount: _playlists.length,
+                itemBuilder: (context, index) {
+                  final playlist = _playlists[index];
+                  return Column(
+                    children: [
+                      ListTile(
+                        leading: Image.network(
+                          playlist.imageUrl ?? Playlist.defaultImageUrl,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
                         ),
-                      ),
-                      onTap: () async {
-                        // Navigate to playlist details screen
-                        _selectedPlaylist = playlist;
+                        title: Text(
+                          playlist.name,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        onTap: () async {
+                          // Navigate to playlist details screen
+                          _selectedPlaylist = playlist;
 
-                        //NewPlaylist =
-                        //await recommendRandomSongs(_selectedPlaylist!);
-                        Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => PlaylistView(
-                                      playlist: _selectedPlaylist!,
-                                    )));
-                      },
-                    ),
-                    const Divider(
-                      height: 20,
-                      thickness: 1,
-                      indent: 16,
-                      endIndent: 16,
-                    ),
-                  ],
-                );
-              },
-            ),
+                          //NewPlaylist =
+                          //await recommendRandomSongs(_selectedPlaylist!);
+                          Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => PlaylistView(
+                                        playlist: _selectedPlaylist!,
+                                      )));
+                        },
+                      ),
+                      const Divider(
+                        height: 20,
+                        thickness: 1,
+                        indent: 16,
+                        endIndent: 16,
+                      ),
+                    ],
+                  );
+                },
+              ),
+      ),
     );
   }
 }

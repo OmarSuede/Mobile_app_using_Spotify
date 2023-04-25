@@ -4,10 +4,10 @@ import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter/services.dart';
-import 'package:reccomendify/RecommendedPlaylist.dart';
+import 'package:musily/RecommendedPlaylist.dart';
 import 'package:spotify_sdk/spotify_sdk.dart';
-
-import 'package:reccomendify/PlaylistPage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:musily/PlaylistPage.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class PlaylistView extends StatefulWidget {
@@ -25,15 +25,9 @@ class _PlaylistViewState extends State<PlaylistView> {
   late Playlist NewPlaylist;
 
   void _initSpotify() async {
-    var accessToken = await SpotifySdk.getAccessToken(
-        clientId: dotenv.env['CLIENT_ID'].toString(),
-        redirectUrl: dotenv.env['REDIRECT_URL'].toString(),
-        scope: 'app-remote-control, '
-            'user-modify-playback-state, '
-            'playlist-read-private, '
-            'playlist-modify-public,user-read-currently-playing');
+    final pref = await SharedPreferences.getInstance();
     setState(() {
-      _accessToken = accessToken;
+      _accessToken = pref.getString("_Token")!;
     });
     await _fetchSongs(widget.playlist);
   }
@@ -53,13 +47,6 @@ class _PlaylistViewState extends State<PlaylistView> {
         final items = jsonData['items'] as List<dynamic>;
         final songs = items.map((items) {
           final song = items['track'];
-          /*
-          final durationMs = song['duration_ms'] as int;
-          final Duration duration = Duration(milliseconds: durationMs)
-              .toString()
-              .split('.')
-              .first
-              .padLeft(8, "0") as Duration;*/
           return Song(
             id: song['id'] as String,
             name: song['name'] as String,
@@ -69,7 +56,6 @@ class _PlaylistViewState extends State<PlaylistView> {
             imageUrl: song['album']['images'].isNotEmpty
                 ? song['album']['images'][0]['url'] as String?
                 : null,
-            //songDuration: duration
           );
         }).toList();
         _songsFuture = songs;
@@ -160,6 +146,31 @@ class _PlaylistViewState extends State<PlaylistView> {
     }
   }
 
+  void openSpotifySong(String songId) async {
+    final Uri url = Uri.parse('spotify:track:$songId');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url);
+    } else {
+      throw 'Could not launch $url';
+    }
+  }
+
+  Future<bool> checkIfPremium() async {
+    final response = await http.get(
+      Uri.parse('https://api.spotify.com/v1/me'),
+      headers: {'Authorization': 'Bearer $_accessToken'},
+    );
+
+    if (response.statusCode == 200) {
+      final jsonResponse = jsonDecode(response.body);
+      final productType = jsonResponse['product'] ?? '';
+      return productType == 'premium';
+      //print("yoooooo" + productType);
+    } else {
+      throw Exception('Failed to get user info: ${response.statusCode}');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -180,29 +191,35 @@ class _PlaylistViewState extends State<PlaylistView> {
                 return Column(
                   children: [
                     ListTile(
-                      leading: Image.network(
-                        songs.imageUrl ?? Song.defaultImageUrl,
-                        width: 50,
-                        height: 50,
-                        fit: BoxFit.cover,
-                      ),
-                      title: Text(
-                        songs.name,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                        leading: Image.network(
+                          songs.imageUrl ?? Song.defaultImageUrl,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
                         ),
-                      ),
-                      subtitle: Text(
-                        songs.artistName,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
+                        title: Text(
+                          songs.name,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
-                    ),
-                    Divider(
+                        subtitle: Text(
+                          songs.artistName,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        onTap: () async {
+                          if (await checkIfPremium()) {
+                            openSpotifySong(songs.id);
+                          } else {
+                            null;
+                          }
+                        }),
+                    const Divider(
                       height: 20,
                       thickness: 1,
                       indent: 16,
@@ -220,20 +237,17 @@ class _PlaylistViewState extends State<PlaylistView> {
       bottomNavigationBar: PreferredSize(
         preferredSize: const Size.fromHeight(200.0),
         child: BottomAppBar(
-          color: Color(0xFFFF6161),
+          color: const Color(0xFFFF6161),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                height: 50,
-                width: 150,
+                padding: EdgeInsets.fromLTRB(0, 5, 10, 0),
                 child: SizedBox(
-                  width: 100,
-                  height: 25,
                   child: ElevatedButton(
                     style: ButtonStyle(
                       backgroundColor:
-                          MaterialStatePropertyAll<Color>(Color(0xFFFF6161)),
+                          MaterialStatePropertyAll<Color>(Color(0xFF1C1B1B)),
                     ),
                     onPressed: () async {
                       NewPlaylist = await recommendRandomSongs(widget.playlist);
@@ -246,7 +260,7 @@ class _PlaylistViewState extends State<PlaylistView> {
                     },
                     child: Text(
                       'Generate Playlist',
-                      style: TextStyle(color: Color(0xFF1C1B1B), fontSize: 15),
+                      style: TextStyle(color: Color(0xFFFF6161), fontSize: 15),
                     ),
                   ),
                 ),
@@ -254,7 +268,7 @@ class _PlaylistViewState extends State<PlaylistView> {
               ElevatedButton(
                 style: ButtonStyle(
                   backgroundColor:
-                      MaterialStatePropertyAll<Color>(Color(0xFFFF6161)),
+                      MaterialStatePropertyAll<Color>(Color(0xFF1C1B1B)),
                 ),
                 onPressed: (
                     //open in spotify
@@ -263,7 +277,7 @@ class _PlaylistViewState extends State<PlaylistView> {
                 },
                 child: Text(
                   'Open in Spotify',
-                  style: TextStyle(color: Color(0xFF1C1B1B), fontSize: 15),
+                  style: TextStyle(color: Color(0xFFFF6161), fontSize: 15),
                 ),
               ),
             ],

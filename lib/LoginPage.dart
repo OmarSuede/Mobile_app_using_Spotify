@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:reccomendify/ChoosePage.dart';
-import 'package:reccomendify/WelcomeScreen.dart';
-import 'package:reccomendify/main.dart';
+import 'package:musily/ChoosePage.dart';
+import 'package:musily/WelcomeScreen.dart';
+import 'package:musily/main.dart';
 import 'package:spotify_sdk/spotify_sdk.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key, required this.title});
@@ -49,6 +50,7 @@ class _LoginPageState extends State<LoginPage> {
         setStatus('connect to spotify failed');
       }
     } on PlatformException catch (e) {
+      LoginSpotify();
       setState(() {
         _loading = false;
       });
@@ -58,6 +60,24 @@ class _LoginPageState extends State<LoginPage> {
         _loading = false;
       });
       setStatus('not implemented');
+    }
+  }
+
+  registerSpotify() async {
+    final Uri url = Uri.parse('spotify:signup');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url);
+    } else {
+      throw 'Failed';
+    }
+  }
+
+  LoginSpotify() async {
+    final Uri url = Uri.parse('spotify:login');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url);
+    } else {
+      throw 'Failed';
     }
   }
 
@@ -94,6 +114,7 @@ class _LoginPageState extends State<LoginPage> {
                 child: TextButton(
                   onPressed: () {
                     //login using spotify
+
                     connectToSpotifyRemote();
                   },
                   child: Text(
@@ -116,7 +137,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     TextButton(
                       onPressed: () {
-                        //TODO take you to register for spotify
+                        registerSpotify();
                       },
                       child: Text(
                         'Register Here',
@@ -125,6 +146,14 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ],
                 ),
+              ),
+              const Text(
+                "Note: You need to have spotify downloaded",
+                style: TextStyle(
+                    fontFamily: 'Impact',
+                    fontSize: 12,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700),
               ),
             ],
           ),

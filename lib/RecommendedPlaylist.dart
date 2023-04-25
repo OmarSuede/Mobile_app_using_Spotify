@@ -4,9 +4,10 @@ import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spotify_sdk/spotify_sdk.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:reccomendify/PlaylistPage.dart';
+import 'package:musily/PlaylistPage.dart';
 
 class RecommendedPlaylist extends StatefulWidget {
   final Playlist playlist;
@@ -22,15 +23,9 @@ class _RecommendedPlaylistState extends State<RecommendedPlaylist> {
   late String _accessToken;
 
   void _initSpotify() async {
-    var accessToken = await SpotifySdk.getAccessToken(
-        clientId: dotenv.env['CLIENT_ID'].toString(),
-        redirectUrl: dotenv.env['REDIRECT_URL'].toString(),
-        scope: 'app-remote-control, '
-            'user-modify-playback-state, '
-            'playlist-read-private, '
-            'playlist-modify-public,user-read-currently-playing');
+    final pref = await SharedPreferences.getInstance();
     setState(() {
-      _accessToken = accessToken;
+      _accessToken = pref.getString("_Token")!;
     });
     await _fetchSongs(widget.playlist);
   }
@@ -79,6 +74,22 @@ class _RecommendedPlaylistState extends State<RecommendedPlaylist> {
     }
   }
 
+  Future<bool> checkIfPremium() async {
+    final response = await http.get(
+      Uri.parse('https://api.spotify.com/v1/me'),
+      headers: {'Authorization': 'Bearer $_accessToken'},
+    );
+
+    if (response.statusCode == 200) {
+      final jsonResponse = jsonDecode(response.body);
+      final productType = jsonResponse['product'] ?? '';
+      return productType == 'premium';
+      //print("yoooooo" + productType);
+    } else {
+      throw Exception('Failed to get user info: ${response.statusCode}');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -96,6 +107,15 @@ class _RecommendedPlaylistState extends State<RecommendedPlaylist> {
       await launchUrl(spotifyUrl);
     } else {
       throw 'Could not launch Spotify.';
+    }
+  }
+
+  void openSpotifySong(String songId) async {
+    final Uri url = Uri.parse('spotify:track:$songId');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url);
+    } else {
+      throw 'Could not launch $url';
     }
   }
 
@@ -145,11 +165,14 @@ class _RecommendedPlaylistState extends State<RecommendedPlaylist> {
                           color: Colors.grey,
                         ),
                       ),
-                      onTap: () {
-                        SpotifySdk.play(
-                          spotifyUri: 'spotify:track:${songs.id}',
-                        );
-                        /*
+                      onTap: () async {
+                        if (await checkIfPremium()) {
+                          openSpotifySong(songs.id);
+                          SpotifySdk.play(
+                            spotifyUri: 'spotify:track:${songs.id}',
+                          );
+                        }
+/*
                         final trackList = _songsFuture
                             .skip(index + 1)
                             .map((song) => 'spotify:track:${song.id}')
@@ -186,41 +209,45 @@ class _RecommendedPlaylistState extends State<RecommendedPlaylist> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                height: 50,
-                width: 150,
+                child: SizedBox(
+                  child: ElevatedButton(
+                    style: ButtonStyle(
+                      backgroundColor:
+                          MaterialStatePropertyAll<Color>(Color(0xFF1C1B1B)),
+                    ),
+                    onPressed: () async {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => PlaylistPage(
+                                    title: '',
+                                  )));
+                    },
+                    child: Text(
+                      'Go Back',
+                      style: TextStyle(color: Color(0xFFFF6161), fontSize: 15),
+                    ),
+                  ),
+                ),
+                padding: EdgeInsets.fromLTRB(0, 5, 20, 0),
+              ),
+              Container(
                 child: ElevatedButton(
                   style: ButtonStyle(
                     backgroundColor:
-                        MaterialStatePropertyAll<Color>(Color(0xFFFF6161)),
+                        MaterialStatePropertyAll<Color>(Color(0xFF1C1B1B)),
                   ),
-                  onPressed: () async {
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => PlaylistPage(
-                                  title: '',
-                                )));
+                  onPressed: (
+                      //open in spotify
+                      ) async {
+                    openSpotifyPlaylist(widget.playlist.id);
                   },
                   child: Text(
-                    'Go back',
-                    style: TextStyle(color: Color(0xFF1C1B1B), fontSize: 15),
+                    'Open in Spotify',
+                    style: TextStyle(color: Color(0xFFFF6161), fontSize: 15),
                   ),
                 ),
-              ),
-              ElevatedButton(
-                style: ButtonStyle(
-                  backgroundColor:
-                      MaterialStatePropertyAll<Color>(Color(0xFFFF6161)),
-                ),
-                onPressed: (
-                    //open in spotify
-                    ) async {
-                  openSpotifyPlaylist(widget.playlist.id);
-                },
-                child: Text(
-                  'Open in Spotify',
-                  style: TextStyle(color: Color(0xFF1C1B1B), fontSize: 15),
-                ),
+                padding: EdgeInsets.fromLTRB(0, 5, 0, 0),
               ),
             ],
           ),
