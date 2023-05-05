@@ -4,8 +4,8 @@ Musily is a application that is made for people that want to discover new music.
 
 ## Sample Screenshots
 
-![Screenshot 1](https://play-lh.googleusercontent.com/dfJrkFE7fFn578GQWYrgq6TQsmDstm8CfmMC0Lvs_yzcMt9d9gmWpsqToj1MVWldIXY=w2560-h1440-rw)
-![Screenshot 2](https://play-lh.googleusercontent.com/oKwbqxen_PghENGKHwoNxB8Gptn3Acaajxw_n0Kf2ubvdV7ru_ooVSDN99pKr53qVrc=w2560-h1440-rw)
+<img src="https://play-lh.googleusercontent.com/dfJrkFE7fFn578GQWYrgq6TQsmDstm8CfmMC0Lvs_yzcMt9d9gmWpsqToj1MVWldIXY=w2560-h1440-rw" width="1280">
+<img src="https://play-lh.googleusercontent.com/oKwbqxen_PghENGKHwoNxB8Gptn3Acaajxw_n0Kf2ubvdV7ru_ooVSDN99pKr53qVrc=w2560-h1440-rw" width="1280">
 
 ## Features
 
