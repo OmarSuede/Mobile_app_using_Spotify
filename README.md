@@ -1,16 +1,18 @@
-# reccomendify
+## Musily
 
-A new Flutter project.
+Musily is a application that is made for people that want to discover new music. The app will make a new playlist for you based on the songs you like.
 
-## Getting Started
+## Sample Screenshots
 
-This project is a starting point for a Flutter application.
+![Screenshot 1](https://play-lh.googleusercontent.com/dfJrkFE7fFn578GQWYrgq6TQsmDstm8CfmMC0Lvs_yzcMt9d9gmWpsqToj1MVWldIXY=w2560-h1440-rw)
+![Screenshot 2](https://play-lh.googleusercontent.com/oKwbqxen_PghENGKHwoNxB8Gptn3Acaajxw_n0Kf2ubvdV7ru_ooVSDN99pKr53qVrc=w2560-h1440-rw)
 
-A few resources to get you started if this is your first Flutter project:
+## Features
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+	
+    Musily generate a new playlist for you, based on a playlist you input.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+
+## Technologies
+
+Musily is built using [flutter](https://flutter.dev/
